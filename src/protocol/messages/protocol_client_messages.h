@@ -1,7 +1,10 @@
 #ifndef CLIENT_MESSAGES_H
+#include <stdint.h>
+#include "../protocol_header.h"
 
+// JGM
 struct join_game_msg {
-    uint16_t header;
+    protocol_header header;
     /* 
      *  +-0-+-1-+-2-+-3-+-4-+-5-+-6-+-7-+-8-+-9-+-0-+-1-+-2-+-3-+-4-+-5-+
      *  |CODEREQ                                            |ID     |EQ | header (B.E.)
@@ -23,8 +26,9 @@ struct join_game_msg {
      * */
 };
 
-struct game_data_msg {
-    uint16_t header;
+// ADM
+struct action_data_msg {
+    protocol_header header;
     uint16_t data;
     /* 
      *  +-0-+-1-+-2-+-3-+-4-+-5-+-6-+-7-+-8-+-9-+-0-+-1-+-2-+-3-+-4-+-5-+
@@ -52,8 +56,9 @@ struct game_data_msg {
      * */
 };
 
-struct chat_msg {
-    uint16_t header;
+// CCM
+struct client_chat_msg {
+    protocol_header header;
     uint8_t msg_len;
     char *data;
     /* 

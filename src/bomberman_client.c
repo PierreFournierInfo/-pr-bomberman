@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include "protocol/messages/protocol_client_messages.h"
 
 #define TEXT_SIZE 255
 
@@ -154,8 +155,8 @@ bool perform_action(board* b, pos* p, ACTION a) {
     return false;
 }
 
-void menu_tick() {
-    
+void menu_tick(board *b, line *l) {
+    refresh_game(b,l);
 }
 
 int main()
@@ -185,7 +186,7 @@ int main()
 
 	switch (game_state) {
 	    case MENU :
-            menu_tick(b, a	);
+            menu_tick(b, l);
         case GAME :
             break;
         default : 

@@ -1,40 +1,39 @@
-CC = gcc
+C = gcc
 CFLAGS = -Wall
 LDFLAGS = -lncurses
-SRC_DIR = src
-OBJ_DIR = obj
 BIN_DIR = bin
-RES_DIR = res
-
-# Trouver tous les fichiers .c 
-SRCS := $(shell find $(SRC_DIR) -name '*.c')
-
-# Generer les fichiers objets
-OBJS := $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRCS))
+SRC_DIR = src
+CURR_DIR = $(shell pwd)
 
 # Defintion du nom de l'executable
-TARGET = $(BIN_DIR)/bomberman
+CLIENT_TARGET = $(BIN_DIR)/bomberman_client
+
+SERVER_TARGET = $(BIN_DIR)/bomberman_server
 
 # Cible par defaut
-all: $(TARGET)
+all: $(CLIENT_TARGET)
 
-# Compilation des fichiers .c en .o
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
-	@mkdir -p $(@D)
-	$(CC) $(CFLAGS) -c $< -o $@
+client : $(CLIENT_TARGET)
 
-# Liaisons des fichiers objets a l'executable
-$(TARGET): $(OBJS)
-	@mkdir -p $(@D)
-	$(CC) $(OBJS) $(LDFLAGS) -o $(TARGET)
-	cp -r $(RES_DIR) $(BIN_DIR)/
+server: $(SERVER_TARGET)
+
+$(CLIENT_TARGET):
+	mkdir -p $(BIN_DIR)
+	$(CC) $(LDFLAGS) -o $(CLIENT_TARGET) $(SRC_DIR)/bomberman_client.c
+
+$(SERVER_TARGET):
+	mkdir -p $(BIN_DIR)
+	$(CC) $(LDFLAGS) -o $(SERVER_TARGET) $(SRC_DIR)/bomberman_server.c
 
 # Nettoyage des artefacts de compilation.
 clean:
-	rm -rf $(OBJ_DIR) $(BIN_DIR)
+	rm -rf $(BIN_DIR)
 
-run :
-	$(BIN_DIR)/bomberman
+rclient :
+	xterm -e $(CURR_DIR)/$(BIN_DIR)/bomberman_client &
+
+rserver :
+	xterm -e $(CURR_DIR)/$(BIN_DIR)/bomberman_server &
 
 br : all run
 

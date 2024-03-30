@@ -1,8 +1,11 @@
 #ifndef SERVER_MESSAGES_H
+#include <stdint.h>
+#include "../protocol_header.h"
 
+// IGM
 struct init_game_msg {
-    uint16_t header,
-             portudp,
+    protocol_header header;
+    uint16_t portudp,
              portmdiff;
     char adrmdiff[128];
     /* 
@@ -28,9 +31,10 @@ struct init_game_msg {
      * */
 };
 
+// GGM
 struct game_grid_msg {
-    uint16_t header,
-             num;
+    protocol_header header;
+    uint16_t  num;
     uint8_t height,
             width;
     char *data;
@@ -46,7 +50,7 @@ struct game_grid_msg {
      * 	+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
      *  |TILE0                          |TILE1 ...                        data
      *  +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-     *:
+     *
      *  - CODEREQ : 11;
      *  - ID & EQ : 0;
      *  - NUM : message number % 2^16 (messages sent every seconds);
@@ -59,23 +63,75 @@ struct game_grid_msg {
      *      - 4 if E_BOMB;
      *      - 5 + i if PLAYER with player.id == i.
      *
-     * Message broadcasted every freq ms :
+     * Message broadcasted every `freq` ms :
      * 
      *  +-0-+-1-+-2-+-3-+-4-+-5-+-6-+-7-+-8-+-9-+-0-+-1-+-2-+-3-+-4-+-5-+
      *  |CODEREQ                                            |ID     |EQ | header (B.E.) 
      *  +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
      *  |NUM    							                            | num (B.E.)
      *  +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-     * 	|NB                             |                                 height
-     * 	+---+---+---+---+---+---+---+---+
-     *
+     * 	|NB                             |0x00                           | height
+     * 	+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     *  |TILE0                                                            data
+     * 	+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     * 	|                               |TILE1...
+     * 	+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     * 	
      * 	- CODEREQ : 12;
      * 	- ID & EQ : 0;
-     *  - NUM : message number % 2^16 (messages sent every seconds);
+     *  - NUM : message number % 2^16 (messages sent every `freq` ms);
+     *  - NB : number of transmitted tiles.
+     *  - data : each tile is encoded on 24 bytes (3 octets) :
+     *      - 1st octet : tile's line number;
+     *      - 2nd octet : tile's column number;
+     *      - 3rd octet : tile's content.
      * 
-     *
      *  */
      
+};
+
+
+// SCM
+struct server_chat_msg {
+    protocol_header header;
+    uint8_t msg_len;
+    char *data;
+    /* 
+     *  +-0-+-1-+-2-+-3-+-4-+-5-+-6-+-7-+-8-+-9-+-0-+-1-+-2-+-3-+-4-+-5-+
+     *  |CODEREQ                                            |ID     |EQ | header (B.E.)
+     *  +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     *  |LEN                            |DATA...                          msg_len + data
+     *  +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     *
+     *  - CODEREQ :
+     *      - 13 if GLOBAL_MSG;
+     *      - 14 if TEAM_MSG;
+     *  - ID : sender's id.
+     *  - EQ : sender's team id;
+     *  - LEN : data length.
+     *  - DATA : message data.
+     *
+     * */
+};
+
+
+// EGM
+struct end_game_msg {
+    protocol_header header;
+    /*  +-0-+-1-+-2-+-3-+-4-+-5-+-6-+-7-+-8-+-9-+-0-+-1-+-2-+-3-+-4-+-5-+
+     *  |CODEREQ                                            |ID     |EQ | header (B.E.)
+     *  +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+     *
+     *  - CODEREQ :
+     *      - 15 if FFA;
+     *      - 16 if TDM.
+     *  - ID :
+     *      - winner's id if CODEREQ == FFA;
+     *      - else, ignored.
+     *  - EQ : 
+     *      - victorious team id if CODEREQ == TDM;
+     *      - else, ignored.
+     * */
 };
 
 #endif // !SERVER_MESSAGES_H
