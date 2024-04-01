@@ -155,7 +155,8 @@ bool perform_action(board* b, pos* p, ACTION a) {
     return false;
 }
 
-void menu_tick(board *b, line *l) {
+void menu_tick(board *b, line *l, ACTION a, pos* p) {
+    perform_action(b, p, a);
     refresh_game(b,l);
 }
 
@@ -186,7 +187,7 @@ int main()
 
 	switch (game_state) {
 	    case MENU :
-            menu_tick(b, l);
+            menu_tick(b, l, a, p);
         case GAME :
             break;
         default : 

@@ -1,4 +1,4 @@
-C = gcc
+CC = gcc
 CFLAGS = -Wall
 LDFLAGS = -lncurses
 BIN_DIR = bin
