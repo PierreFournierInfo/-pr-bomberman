@@ -5,19 +5,19 @@
 #include <stdlib.h>
 #include <string.h>
 #include "protocol/messages/protocol_client_messages.h"
+#include "headers/structs.h"
+#include "game/headers/game.h"
+#include "game/headers/bomb.h"
+#include "game/headers/player.h"
 
 #define TEXT_SIZE 255
 
-typedef enum ACTION { NONE, UP, DOWN, LEFT, RIGHT, QUIT } ACTION;
-typedef enum GAMESTATE { MENU, GAME } GAMESTATE;
+typedef enum GAMESTATE GAMESTATE;
+typedef enum ACTION ACTION;
 
 GAMESTATE game_state;
-
-typedef struct board {
-    char* grid;
-    int w;
-    int h;
-} board;
+int running,
+    chat_type;
 
 typedef struct line {
     char data[TEXT_SIZE];
@@ -29,74 +29,13 @@ typedef struct pos {
     int y;
 } pos;
 
-void setup_board(board* board) {
-    int lines = 30;
-    int columns = 50;
-    // getmaxyx(stdscr,lines,columns);
-    board->h = lines - 2 - 1; // 2 rows reserved for border, 1 row for line
-    board->w = columns - 2; // 2 columns reserved for border
-    board->grid = calloc((board->w)*(board->h),sizeof(char));
-}
-
 void free_board(board* board) {
     free(board->grid);
 }
 
-int get_grid(board* b, int x, int y) {
-    return b->grid[y*b->w + x];
-}
+void refresh_menu(board* b, line* l) {}
 
-void set_grid(board* b, int x, int y, int v) {
-    b->grid[y*b->w + x] = v;
-}
-
-void refresh_game(board* b, line* l) {
-    // Update grid
-    int x,y;
-    for (y = 0; y < b->h; y++) {
-        for (x = 0; x < b->w; x++) {
-            char c;
-            switch (get_grid(b,x,y)) {
-                case 0:
-                    c = ' ';
-                    break;
-                case 1:
-                    c = 'O';
-                    break;
-                default:
-                    c = '?';
-                    break;
-            }
-            mvaddch(y+1,x+1,c);
-        }
-    }
-    for (x = 0; x < b->w+2; x++) {
-        mvaddch(0, x, '-');
-        mvaddch(b->h+1, x, '-');
-    }
-    for (y = 0; y < b->h+2; y++) {
-        mvaddch(y, 0, '|');
-        mvaddch(y, b->w+1, '|');
-    }
-    mvaddch(0, 0,'o');
-    mvaddch(0, b->w + 1,'o');
-    mvaddch(b->h + 1, 0,'o');
-    mvaddch(b->h + 1, b->w + 1,'o');
-
-    // Update chat text
-    attron(COLOR_PAIR(1)); // Enable custom color 1
-    attron(A_BOLD); // Enable bold
-    for (x = 0; x < b->w+2; x++) {
-        if (x >= TEXT_SIZE || x >= l->cursor)
-            mvaddch(b->h+2, x, ' ');
-        else
-            mvaddch(b->h+2, x, l->data[x]);
-    }
-    attroff(A_BOLD); // Disable bold
-    attroff(COLOR_PAIR(1)); // Disable custom color 1
-    refresh(); // Apply the changes to the terminal
-}
-
+    
 ACTION control(line* l) {
     int c;
     int prev_c = ERR;
@@ -124,6 +63,8 @@ ACTION control(line* l) {
         case KEY_BACKSPACE:
             if (l->cursor > 0) l->cursor--;
             break;
+        case KEY_ENTER:
+            a = ENTER; break;
         default:
             if (prev_c >= ' ' && prev_c <= '~' && l->cursor < TEXT_SIZE)
                 l->data[(l->cursor)++] = prev_c;
@@ -132,42 +73,7 @@ ACTION control(line* l) {
     return a;
 }
 
-bool perform_action(board* b, pos* p, ACTION a) {
-    int xd = 0;
-    int yd = 0;
-    switch (a) {
-	case LEFT:
-            xd = -1; yd = 0; break;
-        case RIGHT:
-            xd = 1; yd = 0; break;
-        case UP:
-            xd = 0; yd = -1; break;
-        case DOWN:
-            xd = 0; yd = 1; break;
-        case QUIT:
-            return true;
-        default: break;
-    }
-    p->x += xd; p->y += yd;
-    p->x = (p->x + b->w)%b->w;
-    p->y = (p->y + b->h)%b->h;
-    set_grid(b,p->x,p->y,1);
-    return false;
-}
-
-void menu_tick(board *b, line *l, ACTION a, pos* p) {
-    perform_action(b, p, a);
-    refresh_game(b,l);
-}
-
-int main()
-{
-    board* b = malloc(sizeof(board));;
-    line* l = malloc(sizeof(line));
-    l->cursor = 0;
-    pos* p = malloc(sizeof(pos));
-    p->x = 0; p->y = 0;
-
+void setup_ncurses() {
     // NOTE: All ncurses operations (getch, mvaddch, refresh, etc.) must be done on the same thread.
     initscr(); /* Start curses mode */
     raw(); /* Disable line buffering */
@@ -178,30 +84,29 @@ int main()
     curs_set(0); // Set the cursor to invisible
     start_color(); // Enable colors
     init_pair(1, COLOR_YELLOW, COLOR_BLACK); // Define a new color style (text is yellow, background is black)
+}
 
-    game_state = MENU;
-    setup_board(b);
+int main() {
+    setup_ncurses();
 
-    while (true) {
-	ACTION a = control(l);
+    line *l = malloc(sizeof(line));
+    game *game = setup_game();
+    player *player = setup_player();
 
-	switch (game_state) {
-	    case MENU :
-            menu_tick(b, l, a, p);
-        case GAME :
-            break;
-        default : 
-            break;
-	}
+    game_add_player(game, player);
 
-        usleep(30*1000);
+    while(running) {
+	    ACTION a = control(l);
+
+        player_handle_input(player, a);
+
+    	run_game(game);
     }
-    free_board(b);
 
     curs_set(1); // Set the cursor to visible again
     endwin(); /* End curses mode */
 
-    free(p); free(l); free(b);
+    free_game(game);
 
     return 0;
 }
