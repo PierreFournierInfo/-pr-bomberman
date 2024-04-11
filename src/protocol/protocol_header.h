@@ -12,4 +12,27 @@ struct protocol_header {
 };
 typedef struct protocol_header protocol_header;
 
+typedef struct  {
+    uint16_t codereq;
+    uint8_t id;
+    uint8_t eq;
+} client_message_tcp;
+
+typedef struct {
+    uint16_t codereq;
+    uint8_t id;
+    uint8_t eq;
+    uint16_t num;
+    uint8_t action;
+} client_message_udp;
+
+typedef struct {
+    uint16_t codereq;
+    uint8_t id;
+    uint8_t eq;
+    uint16_t port_udp;
+    uint16_t port_multidiff;
+    uint8_t addr_multidiff[16];
+} server_message_tcp;
+
 #endif // !PROTOCOL_HEADER_H

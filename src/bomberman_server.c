@@ -7,20 +7,74 @@
 #include <errno.h>
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <stdint.h>
+#include <protocol_header.h>
 
 
 #define TCP_PORT 5555
 #define UDP_PORT 5556
 #define SIZE_MSG 1024
 
+
+typedef struct {
+    int socket;
+    uint8_t id;
+    uint8_t eq;
+    uint16_t port_udp;
+    uint16_t port_multidiff;
+    uint8_t addr_multidiff[16];
+    int ready;
+    int x;
+    int y;
+} player;
+
+
+typedef struct {
+    int ready;
+    int players_count;
+    player players[4];
+
+} game;
+
+game *game1;
+
+
+player create_player(int socket, uint8_t id, uint8_t eq,  uint16_t port_udp, uint16_t port_multidiff, uint8_t *addr_multidiff, int x, int y){
+    player p;
+    p.id = id;
+    p.eq = eq;
+    p.port_udp = port_udp;
+    p.port_multidiff = port_multidiff;
+    memcpy(p.addr_multidiff, addr_multidiff, 16);
+    p.x = 0;
+    p.y = 0;
+    return p;
+}
+
+
 void *handle_client_tcp(void *client_socket_tcp) {
     int client_socket = *((int *)client_socket_tcp);
     char buffer[SIZE_MSG];
     int msg_recv;
 
-    while ((msg_recv = recv(client_socket, buffer, sizeof(buffer), 0)) > 0) {
+    int mode_jeu; 
 
-        memset(buffer, 0, sizeof(buffer));
+    
+    int etape = 1;
+    while ((msg_recv = recv(client_socket, buffer, sizeof(buffer), 0)) > 0) {
+        // Premier message pour le mode de jeu
+        if (etape == 1) {
+            client_message_tcp msg = decode_client_message(msg_recv);
+            // printf("codereq : %d\n", mess.codereq);
+            // printf("id : %d\n", mess.id);
+            // printf("eq : %d\n", mess.eq);
+            // player new_player = create_player(client_socket, msg.id, msg.eq, UDP_PORT, );
+            etape++;
+        }
+        // Second message pour savoir si le joueur est prêt
+        else if (etape == 2) {
+
+        }
     }
 
 
@@ -28,7 +82,6 @@ void *handle_client_tcp(void *client_socket_tcp) {
     return NULL;
 
 }
-
 
 void *handle_client_udp(void *client_socket_udp) {
     int client_socket = *((int *)client_socket_udp);
@@ -47,6 +100,28 @@ void *handle_client_udp(void *client_socket_udp) {
     close(client_socket);
     return NULL;
 }
+
+client_message_tcp decode_client_message(char *buffer) {
+    client_message_tcp msg;
+    msg.codereq = ntohs(*((uint16_t *)buffer));
+    msg.id = *((uint8_t *)(buffer + sizeof(uint16_t)));
+    msg.eq = *((uint8_t *)(buffer + sizeof(uint16_t)));
+}
+
+client_message_udp decode_client_message(char *buffer) {
+    client_message_udp msg;
+    msg.codereq = ntohs(*((uint16_t *)buffer));
+    msg.id = *((uint8_t *)(buffer + sizeof(uint16_t)));
+    msg.eq = *((uint8_t *)(buffer + sizeof(uint16_t) + sizeof(uint8_t)));
+    msg.num = ntohs(*((uint16_t *)(buffer + sizeof(uint16_t) + 2* sizeof(uint8_t))));
+    msg.action = *((uint8_t *)(buffer + 2*sizeof(uint16_t) + 2*sizeof(uint8_t)));
+    return msg;
+}
+
+
+
+
+
 
 
 int main() {
@@ -71,7 +146,7 @@ int main() {
     tcp_serv_addr.sin6_port = htons(TCP_PORT);
 
     //*** Lier la socket TCP à l'adresse du server
-    if (bind(tcp_socket_server, 0, sizeof(tcp_serv_addr)) < 0) {
+    if (bind(tcp_socket_server, (struct sockaddr *)&tcp_serv_addr, sizeof(tcp_serv_addr)) < 0) {
         perror("Erreur lors du bind de la socket serveur TCP");
         exit(EXIT_FAILURE);
     }
@@ -97,17 +172,20 @@ int main() {
     udp_serv_addr.sin6_port = htons(UDP_PORT);
 
     //*** Lier la socket UDP à l'adresse du server
-    if (bind(udp_socket_server, 0, sizeof(udp_serv_addr)) < 0) {
+    if (bind(udp_socket_server, (struct sockaddr *)&udp_serv_addr, sizeof(udp_serv_addr)) < 0) {
         perror("Erreur lors du bind de la socket server UDP");
         exit(EXIT_FAILURE);
     }
 
 
-    int players_count = 0;
+    // int players_count = 0;
     pthread_t thread_tcp[4];
 
+    game1 = malloc(sizeof(game));
+    game1->players_count = 0;
+
     //*** Boucle pour accepter les connexions TCP des joueurs
-    while (players_count < 4) {
+    while (game1->players_count < 4) {
         struct sockaddr_in6 client_addr;
         socklen_t client_addr_len = sizeof(client_addr);
         int tcp_socket_client = accept(tcp_socket_server, (struct sockaddr *)&client_addr, &client_addr_len);
@@ -117,12 +195,17 @@ int main() {
         }
         
         //*** Création thread pour gérer le client TCP
-        if (pthread_create(&thread_tcp[players_count], NULL, handle_client_tcp, &tcp_socket_client)) {
+        if (pthread_create(&thread_tcp[game1->players_count], NULL, handle_client_tcp, &tcp_socket_client)) {
             perror("Erreur lors de la création du thread TCP pour un nouveau joueur");
             close(tcp_socket_client);
             continue;
         }    
-        players_count++;    
+        // player new_player;
+        // new_player = malloc(sizeof(player));
+        // game->players[game->players_count] = create_player();
+        
+        // game->players_count++; 
+        
     }
 
 
@@ -164,75 +247,4 @@ int main() {
 
 
     return EXIT_SUCCESS;
-
-
-
-
-
-    // //*** Création de la socket serveur ***
-    // int socket_server = socket(PF_INET6, SOCK_STREAM, 0);
-    // if (socket_server < 0) {
-    //     fprintf(stderr,"échec création socket server: (%d)\n ", errno);
-    //     exit(EXIT_FAILURE);
-    // }
-
-    // //*** Configuration initiale de la socket ***
-    // struct sockaddr_in6 address_socket_server;
-    // memset(&address_socket_server, 0, sizeof(address_socket_server));
-    // address_socket_server.sin6_family = AF_UNSPEC; 
-    // address_socket_server.sin6_port = htons(SERVER_PORT);
-    // address_socket_server.sin6_addr = in6addr_any;
-
-    // //*** Configuration de la socket pour qu'elle devienne polymorphe ***
-    // int no = 0;
-    // int r = setsockopt(socket_server, IPPROTO_IPV6, IPV6_V6ONLY, &no, sizeof(no));
-    // if (r < 0) {
-    //     fprintf(stderr, "echec config de la socket serveur : (%d)\n", errno);
-    //     exit(EXIT_FAILURE);
-    // }
-
-    // //*** Lier la socket au numéro de port ***
-    // int r = bind(socket_server, (struct sockaddr_in6 *)&address_socket_server, sizeof(address_socket_server));
-    // if (r != 0) {
-    //     fprintf(stderr, "echec bind socket server : (%d)\n", errno);
-    //     exit(EXIT_FAILURE);
-    // }
-
-    // r = listen(socket_server, 0);
-    // if (r < 0) {
-    //     fprintf(stderr, "echec listen socket server : (%d)\n", errno);
-    //     exit(EXIT_FAILURE);
-    // }
-
-    
-
-    
-    // printf("Serveur en attente de joueurs...\n");
-    // int clients_count = 0;
-    // pthread_t pthreads[4];
-    // //*** Boucle pour accepter les connexions des clients ***
-    // while (clients_count < 4) {
-    //     struct sockaddr_in6 address_client;
-    //     socklen_t address_size_client = sizeof(address_client);
-    //     int socket_client = accept(socket_server, (struct sockaddr*)&address_client, &address_size_client);
-    //     if (socket_client < 0) {
-    //         fprintf(stderr, "erreur accept connexion joueur : (%d)\n", errno);
-    //         continue;
-    //     }
-
-    //     pthread_t client_thread;
-    //     if (pthread_create(&client_thread, NULL, handle_client, &socket_client) != 0) {
-    //         fprintf(stderr, "erreur creation thread client : (%d)\n", errno);
-    //         close(socket_client);
-    //         continue;
-    //     }
-
-    //     pthreads[clients_count] = client_thread;
-    //     clients_count++;
-    // }
-
-    // // Join les threads des joueurs
-    // for (int i = 0; i < 4; i++){
-    //     pthread_join(pthreads[i], NULL);
-    // }
 }
